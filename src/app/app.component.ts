@@ -83,6 +83,7 @@ export class AppComponent  {
     let startIndex: number = template.indexOf(startChar);
     let endIndex: number = -1;
     let counter = 0;
+    let output = startIndex === -1 ? template.slice(0) : template.substring(0, startIndex);
 
     while (startIndex !== -1) {
       endIndex = template.indexOf(endChar, startIndex);
@@ -124,18 +125,19 @@ export class AppComponent  {
             acc.concat(this.parseTemplate(trTemplate, curr))
           , '');
 
-          template = this.replaceBetween(template, tableStartIndex + trTemplateStartIndex + 1, tableEndIndex + trTemplateEndIndex, listTemplate);
+          output += template.substring(tableStartIndex, trTemplateStartIndex) + listTemplate;
+          endIndex = trTemplateEndIndex;
         }
       } else {
         value = this.getValue(data, tagOpts);
       }
 
-      template = this.replaceBetween(template, startIndex, endIndex + 1, value);
-
       startIndex = template.indexOf(startChar, endIndex);
+      const filler = template.substring(endIndex + 1, startIndex === -1 ? template.length : startIndex);
+      output += value + filler;
     }
-
-    return template;
+    console.log(output);
+    return output;
   }
 
   private getValue(data: any, tagOpts: string[]): string {
