@@ -37,7 +37,7 @@ export class TemplateParseService {
   ) { }
 
   public parse(template: string, data: any): string {
-    const commands = ['TableStart', 'TableEnd', 'Condition', 'RepeaterStart', 'RepeaterEnd'];
+    const commands = ['TableStart', 'TableEnd', 'ConditionStart', 'ConditionEnd', 'RepeaterStart', 'RepeaterEnd'];
     const oc: IOutputControls = {
       start: template.indexOf(startChar),
       end: -1,
