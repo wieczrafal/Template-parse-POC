@@ -121,12 +121,13 @@ export class AppComponent  {
 
           const trTemplate = tableTemplate.substring(trTemplateStartIndex, trTemplateEndIndex + 5); // 5 for tr closing tag
           const items: any[] = this.getValueByPath(path, data);
-          const listTemplate = items.reduce((acc: string, curr) => 
-            acc.concat(this.parseTemplate(trTemplate, curr))
-          , '');
+          console.log(trTemplate);
+          // const listTemplate = items.reduce((acc: string, curr) => 
+          //   acc.concat(this.parseTemplate(trTemplate, curr))
+          // , '');
 
-          output += template.substring(tableStartIndex, trTemplateStartIndex) + listTemplate;
-          endIndex = trTemplateEndIndex;
+          // output += template.substring(tableStartIndex, trTemplateStartIndex) + listTemplate;
+          // endIndex = trTemplateEndIndex;
         }
       } else {
         value = this.getValue(data, tagOpts);
@@ -136,7 +137,6 @@ export class AppComponent  {
       const filler = template.substring(endIndex + 1, startIndex === -1 ? template.length : startIndex);
       output += value + filler;
     }
-    console.log(output);
     return output;
   }
 
