@@ -1,11 +1,13 @@
 import { Component } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, CurrencyPipe, DecimalPipe } from '@angular/common';
 
 const template = `
   <div>Name: «Name»</div>
   <div>Inner Value: «Obj.InnerVal»</div>
-  <div>Date long: «Date:long:Obj.CutoffDate»</div>
-  <div>Date short: «Date:short:Obj.CutoffDate»</div>
+  <div>Date long: «Date:format=long:Obj.CutoffDate»</div>
+  <div>Date short: «Date:format=short:Obj.CutoffDate»</div>
+  <div>Number of ppl: «Number::Obj.NumberOfPeople»</div>
+  <div>Price per person: «Currency:code=USD:Obj.PricePerPerson»</div>
 
   <br>
 
@@ -27,6 +29,19 @@ const template = `
 
 const startChar = '«';
 const endChar = '»';
+const argSeparator = ':';
+const optsSeparator = ',';
+const optsValueSeparator = '=';
+
+interface ITagOptions {
+  [optName: string]: string;
+}
+
+enum TagType {
+  Currency = 'Currency',
+  Date = 'Date',
+  Number = 'Number'
+}
 
 @Component({
   selector: 'my-app',
@@ -38,7 +53,9 @@ export class AppComponent  {
     Name: 'Test',
     Obj: {
       InnerVal: 'Inner Test',
-      CutoffDate: new Date()
+      CutoffDate: new Date(),
+      PricePerPerson: 1000,
+      NumberOfPeople: 2000,
     },
     People: [
       {First: 'James', Last: 'Bong', Age: 30},
@@ -50,7 +67,11 @@ export class AppComponent  {
 
   html = '<div>test</div>';
 
-  constructor(private _datePipe: DatePipe) {}
+  constructor(
+    private _currencyPipe: CurrencyPipe,
+    private _datePipe: DatePipe,
+    private _numberPipe: DecimalPipe
+  ) {}
 
   public ngOnInit() {
     this.html = template;
@@ -70,7 +91,7 @@ export class AppComponent  {
         break;
       }
 
-      const tagOpts: string[] = template.substring(startIndex + 1, endIndex).split(':');
+      const tagOpts: string[] = template.substring(startIndex + 1, endIndex).split(argSeparator);
       let value: string = '';
 
       if (tagOpts.length > 1 && commands.indexOf(tagOpts[0]) !== -1) {
@@ -106,12 +127,7 @@ export class AppComponent  {
           template = this.replaceBetween(template, tableStartIndex + trTemplateStartIndex + 1, tableEndIndex + trTemplateEndIndex, listTemplate);
         }
       } else {
-        value = this.getValueByPath(tagOpts[tagOpts.length - 1], data);
-        if (tagOpts.length > 1) {
-          if (tagOpts[0] === 'Date') { // date value, render with date pipe
-            value = this._datePipe.transform(value, tagOpts[1]);
-          }
-        }
+        value = this.getValue(data, tagOpts);
       }
 
       template = this.replaceBetween(template, startIndex, endIndex + 1, value);
@@ -120,6 +136,28 @@ export class AppComponent  {
     }
 
     return template;
+  }
+
+  private getValue(data: any, tagOpts: string[]): string {
+    let value = this.getValueByPath(tagOpts[tagOpts.length - 1], data);
+    if (tagOpts.length > 1) {
+      value = this.getTypedValue(value, tagOpts[0] as TagType, this.extractOptions(tagOpts[1]), tagOpts[2]);
+    }
+
+    return value;
+  }
+
+  private getTypedValue(value: any, type: TagType, opts: ITagOptions, path: string): string {
+    switch (type) {
+      case TagType.Date:
+        return this._datePipe.transform(value, opts.format);
+      case TagType.Currency:
+        return this._currencyPipe.transform(value, opts.code);
+      case TagType.Number:
+        return this._numberPipe.transform(value);
+      default:
+        return value;
+    }
   }
 
   private  getValueByPath(path: string, data: any): any {
@@ -136,5 +174,13 @@ export class AppComponent  {
 
   private replaceBetween(template: string, start: number, end: number, what) {
     return template.substring(0, start) + what + template.substring(end);
+  }
+
+  // opts example param1=true,param2=test
+  private extractOptions(opts: string): ITagOptions {
+    return opts.split(optsSeparator).reduce((acc, curr) => {
+    const opArr = curr.split(optsValueSeparator);
+    return {...acc, [opArr[0]]: opArr[1]};
+    },{});
   }
 };
