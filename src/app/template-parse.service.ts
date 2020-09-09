@@ -36,18 +36,20 @@ export class TemplateParseService {
     private _numberPipe: DecimalPipe
   ) { }
 
-  public parse(template: string, data: any): string {
+  public parse(template: string, data: any, rootData?: any): string {
     const commands = ['TableStart', 'TableEnd', 'ConditionStart', 'ConditionEnd', 'RepeaterStart', 'RepeaterEnd'];
     const oc: IOutputControls = {
       start: template.indexOf(startChar),
       end: -1,
       output: ''
-    }
+    };
+    let isRoot = false;
 
     oc.output = oc.start === -1 ? template.slice(0) : template.substring(0, oc.start);
     const startIndexes = [oc.start];
 
     while (oc.start !== -1) {
+      isRoot = false;
       oc.end = template.indexOf(endChar, oc.start);
       if (oc.end === -1) {
         throw new Error('Template Syntax Error: Closing tag missing.');
@@ -57,10 +59,15 @@ export class TemplateParseService {
       const tagOpts: string[] = template.substring(oc.start + 1, oc.end).split(argSeparator);
       let value: string = '';
 
+      if (tagOpts[0] === 'Root') {
+        tagOpts.shift();
+        isRoot = true;
+      }
+
       if (tagOpts.length > 1 && commands.indexOf(tagOpts[0]) !== -1) {
-        this.processCommand(tagOpts[0], this.extractOptions(tagOpts[1]), tagOpts[2], data, template, oc);
+        this.processCommand(tagOpts[0], this.extractOptions(tagOpts[1]), tagOpts[2], isRoot? rootData : data, template, oc);
       } else {
-        value = this.getValue(data, tagOpts);
+        value = this.getValue(isRoot ? rootData: data, tagOpts);
       }
 
       oc.start = template.indexOf(startChar, oc.end);
@@ -79,9 +86,14 @@ export class TemplateParseService {
   }
 
   private getValue(data: any, tagOpts: string[]): string {
-    let value = this.getValueByPath(tagOpts[tagOpts.length - 1], data);
-    if (tagOpts.length > 1) {
-      value = this.getTypedValue(value, tagOpts[0] as TagType, this.extractOptions(tagOpts[1]), tagOpts[2]);
+    let value: any;
+    if (tagOpts[0] === 'Label') {
+      value = this.getValueByPath(`labels.${tagOpts[tagOpts.length - 1]}`, data);
+    } else {
+      value = this.getValueByPath(tagOpts[tagOpts.length - 1], data);
+      if (tagOpts.length > 1) {
+        value = this.getTypedValue(value, tagOpts[0] as TagType, this.extractOptions(tagOpts[1]), tagOpts[2]);
+      }
     }
 
     return value;
@@ -106,6 +118,8 @@ export class TemplateParseService {
         return this.processTable(options, path, data, template, oc);
       case 'RepeaterStart':
         return this.processRepeater(options, path, data, template, oc);
+      case 'ConditionStart':
+        return this.processCondition(options, path, data, template, oc);
     }
   }
 
@@ -136,11 +150,29 @@ export class TemplateParseService {
     const trTemplate = repeaterTemplate.substring(templateStartIndex, templateEndIndex + closingTag.length);
     const items: any[] = this.getValueByPath(path, data);
     const listTemplate = items.reduce((acc: string, curr) => 
-      acc.concat(this.parse(trTemplate, curr))
+      acc.concat(this.parse(trTemplate, curr, data))
     , '');
     
-    oc.output += template.substring(repeaterStartIndex + 1, repeaterStartIndex + templateStartIndex + 1) + listTemplate;
+    oc.output += this.parse(template.substring(repeaterStartIndex + 1, repeaterStartIndex + templateStartIndex + 1), data) + listTemplate;
     oc.end = repeaterStartIndex + templateEndIndex + closingTag.length;
+  }
+
+  private processCondition(options: ITagOptions, path: string, data: any, template: string, oc: IOutputControls): void {
+    const value = this.getValueByPath(path, data);
+    const isTruthy = options.not ? !value : value;
+
+    console.log(template.substring(oc.end, oc.end + 50))
+
+    if (!isTruthy) {
+      const closingTag = `${startChar}ConditionEnd:${path}${endChar}`;
+      const conditionTagIndex = template.indexOf(closingTag, oc.end);
+
+      if (conditionTagIndex === -1) {
+        throw new Error(`Template Syntax Error: Condition ${path} not closed.`);
+      }
+
+      oc.end = conditionTagIndex + closingTag.length - 1;
+    }
   }
 
   private  getValueByPath(path: string, data: any): any {
@@ -159,7 +191,7 @@ export class TemplateParseService {
   private extractOptions(opts: string): ITagOptions {
     return opts.split(optsSeparator).reduce((acc, curr) => {
     const opArr = curr.split(optsValueSeparator);
-    return {...acc, [opArr[0]]: opArr[1]};
+    return {...acc, [opArr[0]]: opArr[1] === undefined ? true : opArr[1]};
     },{});
   }
 
